@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+  <!-- these are the arguments you can pass this launch file, for example paused:=true -->
+  <arg name="paused" default="false"/>
+  <arg name="use_sim_time" default="false"/>
+  <arg name="gui" default="true"/>
+  <arg name="headless" default="false"/>
+  <arg name="debug" default="false"/>
+
+  <!-- We resume the logic in empty_world.launch -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="gui" value="$(arg gui)" />
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+    <arg name="headless" value="$(arg headless)"/>
+  </include>
+
+  <param name="robot1" command="$(find xacro)/xacro --inorder '$(find robots_formation)/urdf/dif1.xacro'" />
+  <param name="robot2" command="$(find xacro)/xacro --inorder '$(find robots_formation)/urdf/dif2.xacro'" />
+  <param name="robot3" command="$(find xacro)/xacro --inorder '$(find robots_formation)/urdf/dif3.xacro'" />
+  <arg name="z" default="0.5"/>
+
+  <arg name="x1" default="1"/>
+  <arg name="y1" default="0"/>
+  <node name="mybot1_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
+        args="-urdf -param robot1 -model Differential_Drive1 -x $(arg x1) -y $(arg y1) -z $(arg z)" />
+
+  <arg name="x2" default="-1"/>
+  <arg name="y2" default="-1"/>
+  <node name="mybot2_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
+        args="-urdf -param robot2 -model Differential_Drive2 -x $(arg x2) -y $(arg y2) -z $(arg z)" />
+  
+  <arg name="x3" default="-1"/>
+  <arg name="y3" default="1"/>
+  <node name="mybot3_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
+        args="-urdf -param robot3 -model Differential_Drive3 -x $(arg x3) -y $(arg y3) -z $(arg z)" />  
+          
+</launch>
