@@ -17,16 +17,16 @@ theta2 = 0.0
 x3 = -1.0001
 y3 = 1.0001
 theta3 = 0.0
-setpoint = np.array([[2],[2],[60*math.pi/180],[0],[0],[0]])
+setpoint = np.array([[2.0],[2.0],[60*math.pi/180],[0.0],[0.0],[0.0]])
 setpoint_ant = setpoint
+theta_ref = 0.0
 
 def velRef(msg):
     global uref
     global wref
+    global setpoint
     uref=msg.linear.x
     wref=msg.angular.z
-    print(uref)
-    print(wref)
 
 #ODOMETRY DATA Robot 1
 def Odom1(msg):
@@ -64,12 +64,23 @@ def Odom3(msg):
     angles=euler_from_quaternion([rot_q.x, rot_q.y, rot_q.z, rot_q.w])
     theta3=angles[2]
 
+def integration(v_actual, v_der):
+    v_actual = v_actual + v_der * 0.1
+    return v_actual
+
+def speedReference(uref_,wref_,theta, setpoint_):
+    theta = integration(theta,wref_)
+    Jr = np.array([[math.cos(theta) ,-0.1 * math.sin(theta)],[math.sin(theta) ,0.1 * math.cos(theta)]])
+    speed = np.array([[uref_],[wref_]])
+    p_p = np.dot(Jr,speed)
+    setpoint_[3,0] = setpoint_[3,0] + p_p[0,0] * 0.1
+    setpoint_[4,0] = setpoint_[4,0] + p_p[1,0] * 0.1
+    return setpoint_, theta
+
 def references(setpoint_):
     setpoint_[0,0] = rospy.get_param('d1r',setpoint_[0,0])
     setpoint_[1,0] = rospy.get_param('d2r',setpoint_[1,0])
     setpoint_[2,0] = rospy.get_param('betar',setpoint_[2,0])
-    setpoint_[3,0] = rospy.get_param('xcr',setpoint_[3,0])
-    setpoint_[4,0] = rospy.get_param('ycr',setpoint_[4,0])
     setpoint_[5,0] = rospy.get_param('thetar',setpoint_[5,0])
     return setpoint_
 
@@ -78,11 +89,12 @@ def controlFormation(x_1,y_1,x_2,y_2,x_3,y_3,theta_1,theta_2,theta_3, setpoint_,
     d_2 = math.sqrt((x_1 - x_2)**2 + (y_1 - y_2)**2)
     d_3 = math.sqrt((x_2 - x_3)**2 + (y_2 - y_3)**2)
     beta_ = math.acos((d_1**2 + d_2**2 - d_3**2) / (2 * d_1 * d_2))
-    xc_ = (x_1 + x_2 + x_3) / 3
-    yc_ = (y_1 + y_2 + y_3) / 3
+    xc_ = (x_1 + x_2 + x_3) / 3.0
+    yc_ = (y_1 + y_2 + y_3) / 3.0
     theta_ = math.atan2(2/3 * x_1 - 1/3 * (x_2 + x_3), 2/3 * y_1 - 1/3 * (y_2 + y_3))
     q = np.array([[d_1],[d_2],[beta_],[xc_],[yc_],[theta_]])
     q_e = setpoint_ - q
+    print(q_e)
     q_d = (setpoint_ - setpoint_ant_) / 0.1
     Jr = np.array([[math.cos(theta_1), -0.1 * math.sin(theta_1), 0.0 , 0.0 , 0.0 , 0.0], 
                     [math.sin(theta_1), 0.1 * math.cos(theta_1), 0.0 , 0.0 , 0.0 , 0.0], 
@@ -97,7 +109,7 @@ def controlFormation(x_1,y_1,x_2,y_2,x_3,y_3,theta_1,theta_2,theta_3, setpoint_,
                   [0, 1.0/3.0, 0, 1.0/3.0, 0, 1.0/3.0],
                   [-2/(3*((x_2/3 - (2*x_1)/3 + x_3/3)**2/(y_2/3 - (2*y_1)/3 + y_3/3)**2 + 1)*(y_2/3 - (2*y_1)/3 + y_3/3)), (2*(x_2/3 - (2*x_1)/3 + x_3/3))/(3*((x_2/3 - (2*x_1)/3 + x_3/3)**2/(y_2/3 - (2*y_1)/3 + y_3/3)**2 + 1)*(y_2/3 - (2*y_1)/3 + y_3/3)**2), 1/(3*((x_2/3 - (2*x_1)/3 + x_3/3)**2/(y_2/3 - (2*y_1)/3 + y_3/3)**2 + 1)*(y_2/3 - (2*y_1)/3 + y_3/3)), -(x_2/3 - (2*x_1)/3 + x_3/3)/(3*((x_2/3 - (2*x_1)/3 + x_3/3)**2/(y_2/3 - (2*y_1)/3 + y_3/3)**2 + 1)*(y_2/3 - (2*y_1)/3 + y_3/3)**2), 1/(3*((x_2/3 - (2*x_1)/3 + x_3/3)**2/(y_2/3 - (2*y_1)/3 + y_3/3)**2 + 1)*(y_2/3 - (2*y_1)/3 + y_3/3)), -(x_2/3 - (2*x_1)/3 + x_3/3)/(3*((x_2/3 - (2*x_1)/3 + x_3/3)**2/(y_2/3 - (2*y_1)/3 + y_3/3)**2 + 1)*(y_2/3 - (2*y_1)/3 + y_3/3)**2)]
                   ])
-    control_ = np.dot(np.linalg.inv(np.dot(J,Jr)),q_d + 0.6 * q_e)
+    control_ = np.dot(np.linalg.inv(np.dot(J,Jr)),q_d + 1.5 * q_e)
     return control_, setpoint_
 
 if __name__ == '__main__':
@@ -112,6 +124,7 @@ if __name__ == '__main__':
         diff_vel3 = rospy.Publisher('/cmd_vel3',Twist,queue_size=1)
         rate = rospy.Rate(10.0)
         while not rospy.is_shutdown():
+            setpoint, theta_ref = speedReference(uref,wref,theta_ref,setpoint)
             setpoint = references(setpoint)
             control, setpoint_ant = controlFormation(x1,y1,x2,y2,x3,y3,theta1,theta2,theta3,setpoint,setpoint_ant)            
             cmd1 = Twist()
